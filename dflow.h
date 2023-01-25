@@ -10,7 +10,7 @@
  * Based on States enum in parsl/dataflow/states.py found at
  * https://github.com/Parsl/parsl/blob/master/parsl/dataflow/states.py
  */
-enum taskstate {
+enum state{
    unsched=-1,
    pending=0,
    running=2,
@@ -21,32 +21,26 @@ enum taskstate {
    fail_retryable=8,
    memo_done=9,
    joining=10,
-   running_ended=11
-};
-
-enum datastate {
-   pending=0,
-   done=1,
-   failed=2,
+   running_ended=11,
 };
 
 // task dependency struct
 struct task
 {
-    unsigned long id,
-	enum taskstate status,
-    unsigned long* depends, // list of indexes in tasktable  
+    unsigned long id;
+	int status;
+    unsigned long* depends; // list of indexes in tasktable  
     unsigned long depcount;
-	char* exec_label, // executor is label so can be string
-	char* func_name,
-	int time_invoked, // unix timestamp
-    int join, // 0: is not a join app; 1 is a join app;
+	char* exec_label; // executor is label so can be string
+	char* func_name;
+	int time_invoked; // unix timestamp
+    int join; // 0: is not a join app; 1 is a join app;
 
-	PyObject* future,
-	PyObject* executor,
-	PyObject* func,
-	PyObject* args,
-	PyObject* kwargs,
+	PyObject* future;
+	PyObject* executor;
+	PyObject* func;
+	PyObject* args;
+	PyObject* kwargs;
 };
 
 /*
@@ -56,21 +50,19 @@ struct task
  * use this struct to keep track of data futures
  * the task struct will have a data struct buffer
  */
-struct data{
+struct data
+{
     unsigned long id;
-    enum datastate status;
-}
+    enum state status;
+};
 
 PyObject* method(PyObject*, PyObject*); // test
 
-struct task* tasktable = NULL; // dag represented as table of task structs
-unsigned long tablesize; // number of tasks table can store
-unsigned long taskcount; // number of tasks created
 
 void init_tasktable(unsigned long); // allocate initial amount of memory for table
 int resize_tasktable(unsigned long); //  change the amount of memory in table
 int increment_tasktable(void); // will try to increase table size by TABLE_INC
-int appendtask(char*, char* int, int, PyObject*, PyObject*, PyObject*, PyObject*, PyObject*); // add a task to the dfk
+int appendtask(char*, char*, int, int, PyObject*, PyObject*, PyObject*, PyObject*, PyObject*); // add a task to the dfk
 
 PyObject* init_dfk(PyObject*, PyObject*);
 PyObject* dest_dfk(PyObject*);

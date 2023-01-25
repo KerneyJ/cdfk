@@ -1,36 +1,41 @@
 #include "dflow.h"
 
+struct task* tasktable; // dag represented as table of task structs
+unsigned long tablesize; // number of tasks table can store
+unsigned long taskcount; // number of tasks created
+
 PyObject* method(PyObject* self, PyObject* args){
     int a, b;
-	if(!PyArg_ParseTuple(args, "ii", &a, &b))
-		return NULL;
+    if(!PyArg_ParseTuple(args, "ii", &a, &b))
+        return NULL;
 
-	return Py_BuildValue("i", a + b);
+    return Py_BuildValue("i", a + b);
 }
 
 void init_tasktable(unsigned long numtasks){
     tasktable = (struct task*)malloc(sizeof(struct task) * numtasks);
-	tablesize = numtasks;
-	taskcount = 0;
+    tablesize = numtasks;
+    taskcount = 0;
 }
 
 int resize_tasktable(unsigned long numtasks){
-    if(size > ULONG_MAX) // check if size is too big
+    if(numtasks > ULONG_MAX) // check if size is too big
         return -1;
-	if(!tasktable) // check if task table has been initialized
-		return -1;
 
-	if((tasktable = (struct task*)realloc(tasktable, numtasks * sizeof(struct task*))) == NULL)
-		return -1;
-	
-	tablesize = numtasks;
-	return 0;
+    if(!tasktable) // check if task table has been initialized
+        return -1;
+
+    if((tasktable = (struct task*)realloc(tasktable, numtasks * sizeof(struct task*))) == NULL)
+        return -1;
+
+    tablesize = numtasks;
+    return 0;
 }
 
-int increment_tasktable(void){
+int increment_tasktable(){
     if(tablesize + TABLE_INC > ULONG_MAX)
-		return -1;
-	return resize_tasktable(tablesize + TABLE_INC);
+        return -1;
+    return resize_tasktable(tablesize + TABLE_INC);
 }
 
 /*
@@ -40,39 +45,39 @@ int increment_tasktable(void){
  * functional so task will not be deleted we will
  * just add new task in the next unused spot
  */
-int appendtask(char* exec_label, char* func_name, int time_invoked, int join
-		       PyObject* future, PyObject* executor, PyObject* func, PyObject* args, PyObject* kwargs){
+int appendtask(char* exec_label, char* func_name, int time_invoked, int join, PyObject* future, PyObject* executor, PyObject* func, PyObject* args, PyObject* kwargs){
     // check if the table is large enough
     if(taskcount == tablesize)
-		if(increment_tasktable() < 0)
-		    return -1;
-	struct task* task = &tasktable[taskcount];
-	task->id = taskcount;
-	taskcount++;
-	task->status = unsched;
-	task->depends = NULL;
-	task->depcount = 0;
+        if(increment_tasktable() < 0)
+            return -1;
 
-	task->exec_label = exec_label;
-	task->func_name = func_name;
-	task->time_invoked = time_invoked;
-	task->join = join;
+    struct task* task = &tasktable[taskcount];
+    task->id = taskcount;
+    taskcount++;
+    task->status = unsched;
+    task->depends = NULL;
+    task->depcount = 0;
 
-	task->future = future;
-	task->executor = executor;
-	task->func = func;
-	task->args = args;
-	task->kwargs = kwargs;
-	return 0;
+    task->exec_label = exec_label;
+    task->func_name = func_name;
+    task->time_invoked = time_invoked;
+    task->join = join;
+
+    task->future = future;
+    task->executor = executor;
+    task->func = func;
+    task->args = args;
+    task->kwargs = kwargs;
+    return 0;
 }
 
 PyObject* init_dfk(PyObject* self, PyObject* args){
     unsigned long numtasks;
-	if(!PyArg_ParseTuple(args, "i", &numtasks))
-		return NULL;
+    if(!PyArg_ParseTuple(args, "i", &numtasks))
+        return NULL;
 
-	init_tasktable(numtasks);
-	return Py_None;
+    init_tasktable(numtasks);
+    return Py_None;
 }
 
 /*
@@ -83,10 +88,16 @@ PyObject* init_dfk(PyObject* self, PyObject* args){
  */
 PyObject* dest_dfk(PyObject* self){
     if(tasktable != NULL)
-		free(tasktable);
+        free(tasktable);
+    tablesize = 0;
+    taskcount = 0;
     return Py_None;
 }
 
 PyObject* info_dfk(PyObject* self){
     return PyUnicode_FromFormat("DFK Info -> DFK Initialized: %s; Task table size: %i; Task count: %i;", tasktable ? "True" : "False", tablesize, taskcount);
+}
+
+PyObject* submit(PyObject* self, PyObject* args){
+    return Py_None;
 }
