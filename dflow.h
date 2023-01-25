@@ -59,7 +59,7 @@ struct data
 PyObject* method(PyObject*, PyObject*); // test
 
 
-void init_tasktable(unsigned long); // allocate initial amount of memory for table
+int init_tasktable(unsigned long); // allocate initial amount of memory for table
 int resize_tasktable(unsigned long); //  change the amount of memory in table
 int increment_tasktable(void); // will try to increase table size by TABLE_INC
 int appendtask(char*, char*, int, int, PyObject*, PyObject*, PyObject*, PyObject*, PyObject*); // add a task to the dfk
