@@ -1,6 +1,6 @@
 #include "dflow.h"
 
-struct task* tasktable; // dag represented as table of task structs
+struct task* tasktable = NULL; // dag represented as table of task structs
 unsigned long tablesize; // number of tasks table can store
 unsigned long taskcount; // number of tasks created
 
@@ -12,10 +12,13 @@ PyObject* method(PyObject* self, PyObject* args){
     return Py_BuildValue("i", a + b);
 }
 
-void init_tasktable(unsigned long numtasks){
-    tasktable = (struct task*)malloc(sizeof(struct task) * numtasks);
+int init_tasktable(unsigned long numtasks){
+    tasktable = (struct task*)PyMem_RawMalloc(sizeof(struct task) * numtasks);
+    if(tasktable == NULL)
+        return -1;
     tablesize = numtasks;
     taskcount = 0;
+    return 0;
 }
 
 int resize_tasktable(unsigned long numtasks){
@@ -25,7 +28,7 @@ int resize_tasktable(unsigned long numtasks){
     if(!tasktable) // check if task table has been initialized
         return -1;
 
-    if((tasktable = (struct task*)realloc(tasktable, numtasks * sizeof(struct task*))) == NULL)
+    if((tasktable = (struct task*)PyMem_RawRealloc(tasktable, numtasks * sizeof(struct task*))) == NULL)
         return -1;
 
     tablesize = numtasks;
@@ -73,10 +76,12 @@ int appendtask(char* exec_label, char* func_name, int time_invoked, int join, Py
 
 PyObject* init_dfk(PyObject* self, PyObject* args){
     unsigned long numtasks;
-    if(!PyArg_ParseTuple(args, "i", &numtasks))
+    if(!PyArg_ParseTuple(args, "k", &numtasks))
         return NULL;
 
-    init_tasktable(numtasks);
+    if(init_tasktable(numtasks) < 0)
+        return NULL;
+
     return Py_None;
 }
 
@@ -88,14 +93,14 @@ PyObject* init_dfk(PyObject* self, PyObject* args){
  */
 PyObject* dest_dfk(PyObject* self){
     if(tasktable != NULL)
-        free(tasktable);
+        PyMem_RawFree(tasktable);
     tablesize = 0;
     taskcount = 0;
     return Py_None;
 }
 
 PyObject* info_dfk(PyObject* self){
-    return PyUnicode_FromFormat("DFK Info -> DFK Initialized: %s; Task table size: %i; Task count: %i;", tasktable ? "True" : "False", tablesize, taskcount);
+    return PyUnicode_FromFormat("DFK Info -> Tasktable pointer: %p; Task table size: %i; Task count: %i;", tasktable, tablesize, taskcount);
 }
 
 PyObject* submit(PyObject* self, PyObject* args){
