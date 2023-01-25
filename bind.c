@@ -10,7 +10,7 @@ PyMethodDef cdfk_funcs[] = {
     {"method", (PyCFunction)method, METH_VARARGS, method_docs},
 	{"init_dfk", (PyCFunction)init_dfk, METH_VARARGS, init_dfk_docs},
 	{"dest_dfk", (PyCFunction)dest_dfk, METH_NOARGS, dest_dfk_docs},
-	{"info_dfk_docs", (PyCFunction)info_dfk, METH_NOARGS, info_dfk_docs},
+	{"info_dfk", (PyCFunction)info_dfk, METH_NOARGS, info_dfk_docs},
 	{"submit", (PyCFunction)submit, METH_VARARGS, submit_docs},
 	{NULL}
 };
