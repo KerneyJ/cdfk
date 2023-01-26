@@ -1,5 +1,13 @@
 #include "dflow.h"
 
+/*
+ * Notes, FIXMEs and TODOs
+ * - TODO A lot of functions return NULL in case
+ *   of error, need to change this to set error
+ *   using PyErr_SetString and use error codes from
+ *   https://docs.python.org/3/c-api/exceptions.html#standard-exceptions
+ */
+
 struct task* tasktable = NULL; // dag represented as table of task structs
 unsigned long tablesize; // number of tasks table can store
 unsigned long taskcount; // number of tasks created
