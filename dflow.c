@@ -5,11 +5,12 @@ unsigned long tablesize; // number of tasks table can store
 unsigned long taskcount; // number of tasks created
 
 PyObject* method(PyObject* self, PyObject* args){
-    int a, b;
-    if(!PyArg_ParseTuple(args, "ii", &a, &b))
+    // int a, b;
+    PyObject* obj;
+    if(!PyArg_ParseTuple(args, "O", &obj))
         return NULL;
 
-    return Py_BuildValue("i", a + b);
+    return Py_None; //return Py_BuildValue("i", a + b);
 }
 
 int init_tasktable(unsigned long numtasks){
@@ -48,7 +49,7 @@ int increment_tasktable(){
  * functional so task will not be deleted we will
  * just add new task in the next unused spot
  */
-int appendtask(char* exec_label, char* func_name, int time_invoked, int join, PyObject* future, PyObject* executor, PyObject* func, PyObject* args, PyObject* kwargs){
+int appendtask(char* exec_label, char* func_name, double time_invoked, int join, PyObject* future, PyObject* executor, PyObject* func, PyObject* args, PyObject* kwargs){
     // check if the table is large enough
     if(taskcount == tablesize)
         if(increment_tasktable() < 0)
@@ -112,24 +113,32 @@ PyObject* info_task(PyObject* self, PyObject* args){
     if(!PyArg_ParseTuple(args, "k", &id))
         return NULL;
 
-    return Py_None;
+    if(tasktable == NULL) // TODO throw error here
+        return PyUnicode_FromFormat("DFK Uninitialized");
+
+    if(id >= taskcount) // TODO throw error here
+        return PyUnicode_FromFormat("Task unallocated");
+
+    struct task task = tasktable[id];
+
+    return PyUnicode_FromFormat("Task %lu -> state: %i; depcount: %lu; exec_label: %s; func_name: %s; time invoked: %i; join: %i", // TODO find how to print float
+                                task.id, task.status, task.depcount, task.exec_label, task.func_name, task.time_invoked, task.join);
 }
 
 /*
- * Using N in PyArg_ParseTuple because this does not
- * effect the refernce counter and thus we would not need
- * to deallocate the task in order for the Python Interpreter
- * to deallocate memory for objects
+ * TODO When freeing a task will need to decrement the refernce counts
+ * of the python objects taken as a argument
  */
 PyObject* submit(PyObject* self, PyObject* args){
-    char* exec_label, func_name;
-    int time_invoked, join;
-    PyObject* future, executor, func, args, kwargs;
+    char* exec_label,* func_name;
+    int join;
+    double time_invoked;
+    PyObject* future,* executor,* func,* fargs,* fkwargs;
 
-    if(!PyArg_ParseTuple(args, "ssipNNNN", exec_label, func_name, time_invoked, join, future, executor, func, args, kwargs))
+    if(!PyArg_ParseTuple(args, "ssdpOOOOO", &exec_label, &func_name, &time_invoked, &join, &future, &executor, &func, &fargs, &fkwargs))
         return NULL;
 
-    if(appendtask(exec_label, func_name, time_invoked, join, future, executor, func, args, kwargs) < 0)
+    if(appendtask(exec_label, func_name, time_invoked, join, future, executor, func, fargs, fkwargs) < 0)
         return NULL;
 
     return Py_None;

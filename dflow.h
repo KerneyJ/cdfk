@@ -28,12 +28,12 @@ enum state{
 struct task
 {
     unsigned long id;
-    int status;
+    enum state status;
     unsigned long* depends; // list of indexes in tasktable  
     unsigned long depcount;
     char* exec_label; // executor is label so can be string
     char* func_name;
-    int time_invoked; // unix timestamp
+    double time_invoked; // unix timestamp
     int join; // 0: is not a join app; 1 is a join app;
 
     PyObject* future;
@@ -62,7 +62,7 @@ PyObject* method(PyObject*, PyObject*); // test
 int init_tasktable(unsigned long); // allocate initial amount of memory for table
 int resize_tasktable(unsigned long); //  change the amount of memory in table
 int increment_tasktable(void); // will try to increase table size by TABLE_INC
-int appendtask(char*, char*, int, int, PyObject*, PyObject*, PyObject*, PyObject*, PyObject*); // add a task to the dfk
+int appendtask(char*, char*, double, int, PyObject*, PyObject*, PyObject*, PyObject*, PyObject*); // add a task to the dfk
 
 PyObject* init_dfk(PyObject*, PyObject*);
 PyObject* dest_dfk(PyObject*);
