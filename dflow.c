@@ -71,6 +71,7 @@ int appendtask(char* exec_label, char* func_name, int time_invoked, int join, Py
     task->func = func;
     task->args = args;
     task->kwargs = kwargs;
+
     return 0;
 }
 
@@ -94,8 +95,10 @@ PyObject* init_dfk(PyObject* self, PyObject* args){
 PyObject* dest_dfk(PyObject* self){
     if(tasktable != NULL)
         PyMem_RawFree(tasktable);
+
     tablesize = 0;
     taskcount = 0;
+
     return Py_None;
 }
 
@@ -103,6 +106,31 @@ PyObject* info_dfk(PyObject* self){
     return PyUnicode_FromFormat("DFK Info -> Tasktable pointer: %p; Task table size: %i; Task count: %i;", tasktable, tablesize, taskcount);
 }
 
+PyObject* info_task(PyObject* self, PyObject* args){
+    unsigned long id;
+
+    if(!PyArg_ParseTuple(args, "k", &id))
+        return NULL;
+
+    return Py_None;
+}
+
+/*
+ * Using N in PyArg_ParseTuple because this does not
+ * effect the refernce counter and thus we would not need
+ * to deallocate the task in order for the Python Interpreter
+ * to deallocate memory for objects
+ */
 PyObject* submit(PyObject* self, PyObject* args){
+    char* exec_label, func_name;
+    int time_invoked, join;
+    PyObject* future, executor, func, args, kwargs;
+
+    if(!PyArg_ParseTuple(args, "ssipNNNN", exec_label, func_name, time_invoked, join, future, executor, func, args, kwargs))
+        return NULL;
+
+    if(appendtask(exec_label, func_name, time_invoked, join, future, executor, func, args, kwargs) < 0)
+        return NULL;
+
     return Py_None;
 }

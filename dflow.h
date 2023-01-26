@@ -28,19 +28,19 @@ enum state{
 struct task
 {
     unsigned long id;
-	int status;
+    int status;
     unsigned long* depends; // list of indexes in tasktable  
     unsigned long depcount;
-	char* exec_label; // executor is label so can be string
-	char* func_name;
-	int time_invoked; // unix timestamp
+    char* exec_label; // executor is label so can be string
+    char* func_name;
+    int time_invoked; // unix timestamp
     int join; // 0: is not a join app; 1 is a join app;
 
-	PyObject* future;
-	PyObject* executor;
-	PyObject* func;
-	PyObject* args;
-	PyObject* kwargs;
+    PyObject* future;
+    PyObject* executor;
+    PyObject* func;
+    PyObject* args;
+    PyObject* kwargs;
 };
 
 /*
@@ -67,6 +67,7 @@ int appendtask(char*, char*, int, int, PyObject*, PyObject*, PyObject*, PyObject
 PyObject* init_dfk(PyObject*, PyObject*);
 PyObject* dest_dfk(PyObject*);
 PyObject* info_dfk(PyObject*);
+PyObject* info_task(PyObject*, PyObject*);
 PyObject* submit(PyObject*, PyObject*);
 
 #endif
