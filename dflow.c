@@ -6,19 +6,34 @@
  *   of error, need to change this to set error
  *   using PyErr_SetString and use error codes from
  *   https://docs.python.org/3/c-api/exceptions.html#standard-exceptions
+ * - TODO have multiple queues, a queue for waitng & pending
+ * - TODO maybe split the executor off into another process and
+ *   comunicate with it via a zmq pipe
  */
 
 struct task* tasktable = NULL; // dag represented as table of task structs
 unsigned long tablesize; // number of tasks table can store
 unsigned long taskcount; // number of tasks created
 
-PyObject* method(PyObject* self, PyObject* args){
+/*
+ * In order to invoke object methods we must provide
+ * PyObject_CallMethodObjArgs a PyObject that stores
+ * a string of the method name so the following PyObjects
+ * are will do so and they will be set in the dfk
+ * initialization phase. Likely need to decrement ref
+ * counter in destroy dfk phase
+ */
+
+PyObject* pystr_submit = NULL;
+
+PyTypeObject* method(PyObject* self, PyObject* args){
     // int a, b;
     PyObject* obj;
+    PyTypeObject* type;
     if(!PyArg_ParseTuple(args, "O", &obj))
         return NULL;
-
-    return Py_None; //return Py_BuildValue("i", a + b);
+    type = Py_TYPE(obj);
+    return type; //return Py_BuildValue("i", a + b);
 }
 
 int init_tasktable(unsigned long numtasks){
@@ -92,6 +107,7 @@ PyObject* init_dfk(PyObject* self, PyObject* args){
     if(init_tasktable(numtasks) < 0)
         return NULL;
 
+    pystr_submit = Py_BuildValue("s", "submit");
     return Py_None;
 }
 
@@ -147,6 +163,10 @@ PyObject* submit(PyObject* self, PyObject* args){
         return NULL;
 
     if(appendtask(exec_label, func_name, time_invoked, join, future, executor, func, fargs, fkwargs) < 0)
+        return NULL;
+
+    // invoke executor submit function
+    if(PyObject_CallMethodNoArgs(executor, pystr_submit) == NULL)
         return NULL;
 
     return Py_None;

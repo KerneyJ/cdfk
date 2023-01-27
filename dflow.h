@@ -56,7 +56,7 @@ struct data
     enum state status;
 };
 
-PyObject* method(PyObject*, PyObject*); // test
+PyTypeObject* method(PyObject*, PyObject*); // test
 
 
 int init_tasktable(unsigned long); // allocate initial amount of memory for table
