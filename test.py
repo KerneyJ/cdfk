@@ -6,41 +6,38 @@ def test_init_dfk():
     cdfk.init_dfk(10)
     print(cdfk.info_dfk())
 
-def test_create_task():
+def test_invoke_exec_submit():
+    # Uses XQExecutor because this executor does not have a notion
+    # of a provider. Was never sure why it was so challenging to run
+    # the executor detached from the DFk but it seemed as though it
+    # was the provider that made stuff not
     import time
+
+    from parsl.executors import XQExecutor
+
+    executor = XQExecutor(
+        max_workers=int(4),
+    )
     cdfk.init_dfk(10)
-    cdfk.submit("htex", "add", time.time(), False, object(), object(), object(), object(), object())# , object(), object(), object(), object())
+
+    def add():
+        return 1 + 3;
+
+    executor.start()
+    exec_fu = cdfk.submit("xq", "add", time.time(), False, object(), executor, add)
+    # executor.submit(add, None)
     print(cdfk.info_task(0))
-
-# Building a dummy executor class with
-# a method named submit that takes no
-# arguments and prints task submitted
-def test_invoke_dumexec_submit():
-    import time
-    class DummyExecutor(object):
-        def submit(self):
-            print("task submitted")
-
-    executor = DummyExecutor()
-    cdfk.init_dfk(10)
-    cdfk.submit("htex", "add", time.time(), False, object(), executor, object(), object(), object())
-    print(cdfk.info_task(0))
-
-def test_invoke_exec_submit(object):
-    from parsl.executors import HighThroughputExecutor
-    print(HighThroughputExecutor.submit)
+    while not exec_fu.done():
+        pass
+    print(exec_fu)
+    executor.shutdown()
 
 if __name__ == "__main__":
-    """
     print("Testing init dfk")
     test_init_dfk()
     print("test concluded")
 
-    print("Testing create task and info task")
-    test_create_task()
+    print("Test invoke executor submit on real executor")
+    test_invoke_exec_submit()
     print("test concluded")
-    """
 
-    print("Testing invoke executor submit")
-    test_invoke_dumexec_submit()
-    print("test concluded")
