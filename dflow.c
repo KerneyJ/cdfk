@@ -9,6 +9,9 @@
  * - TODO have multiple queues, a queue for waitng & pending
  * - TODO maybe split the executor off into another process and
  *   comunicate with it via a zmq pipe
+ * - TODO Change all the python bindings to static, this is advised by
+ *   the documentation refernced in this stack overflow post
+ *   https://stackoverflow.com/questions/18745319/why-function-is-static-in-python
  */
 
 struct task* tasktable = NULL; // dag represented as table of task structs
@@ -157,17 +160,30 @@ PyObject* submit(PyObject* self, PyObject* args){
     char* exec_label,* func_name;
     int join;
     double time_invoked;
-    PyObject* future,* executor,* func,* fargs,* fkwargs;
+    PyObject* future,* executor,* func,* fargs=NULL,* fkwargs=NULL,* exec_fu=NULL;
 
-    if(!PyArg_ParseTuple(args, "ssdpOOOOO", &exec_label, &func_name, &time_invoked, &join, &future, &executor, &func, &fargs, &fkwargs))
+    if(!PyArg_ParseTuple(args, "ssdpOOO|OO", &exec_label, &func_name, &time_invoked, &join, &future, &executor, &func, &fargs, &fkwargs))
         return NULL;
 
     if(appendtask(exec_label, func_name, time_invoked, join, future, executor, func, fargs, fkwargs) < 0)
         return NULL;
 
     // invoke executor submit function
-    if(PyObject_CallMethodNoArgs(executor, pystr_submit) == NULL)
+    if(fargs != NULL){
+        if(fkwargs != NULL)
+            exec_fu = PyObject_CallMethodObjArgs(executor, pystr_submit, func, Py_None, fargs, fkwargs);
+        else
+            exec_fu = PyObject_CallMethodObjArgs(executor, pystr_submit, func, Py_None, fargs, NULL);
+    }
+    else{
+        if(fkwargs != NULL)
+            exec_fu = PyObject_CallMethodObjArgs(executor, pystr_submit, func, Py_None, Py_None, fkwargs, NULL);
+        else
+            exec_fu = PyObject_CallMethodObjArgs(executor, pystr_submit, func, Py_None, NULL);
+    }
+
+    if(exec_fu == NULL) // this exist because in the future we should set PyErr and return
         return NULL;
 
-    return Py_None;
+    return exec_fu;
 }
