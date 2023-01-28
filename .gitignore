@@ -1,3 +1,4 @@
 build/
 dist/
 cdfk.egg-info/
+parsl_run_dir/
