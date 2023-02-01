@@ -1,4 +1,4 @@
-#!../cdfkenv/bin/python3
+#!venv/bin/python3
 import cdfk
 import unittest
 
@@ -17,7 +17,7 @@ class TestCDFK(unittest.TestCase):
         from parsl.executors import XQExecutor
 
         executor = XQExecutor(
-            max_workers=int(4),
+            max_workers=4,
         )
         executor.run_dir = f"parsl_run_dir/{str(uuid4())}"
         cdfk.init_dfk(10)
