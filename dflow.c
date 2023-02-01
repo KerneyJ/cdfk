@@ -29,16 +29,6 @@ unsigned long taskcount; // number of tasks created
 
 PyObject* pystr_submit = NULL;
 
-PyTypeObject* method(PyObject* self, PyObject* args){
-    // int a, b;
-    PyObject* obj;
-    PyTypeObject* type;
-    if(!PyArg_ParseTuple(args, "O", &obj))
-        return NULL;
-    type = Py_TYPE(obj);
-    return type; //return Py_BuildValue("i", a + b);
-}
-
 int init_tasktable(unsigned long numtasks){
     tasktable = (struct task*)PyMem_RawMalloc(sizeof(struct task) * numtasks);
     if(tasktable == NULL)
