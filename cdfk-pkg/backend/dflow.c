@@ -1,5 +1,3 @@
-#include "dflow.h"
-
 /*
  * Notes, FIXMEs and TODOs
  * - TODO A lot of functions return NULL in case
@@ -13,6 +11,57 @@
  *   the documentation refernced in this stack overflow post
  *   https://stackoverflow.com/questions/18745319/why-function-is-static-in-python
  */
+#include <Python.h>
+#include <limits.h>
+
+#define TABLE_INC 10000
+
+/*
+ * Based on States enum in parsl/dataflow/states.py found at
+ * https://github.com/Parsl/parsl/blob/master/parsl/dataflow/states.py
+ */
+enum state{
+    unsched=-1,
+    pending=0,
+    running=2,
+    exec_done=3,
+    failed=4,
+    dep_fail=5,
+    launched=7,
+    fail_retryable=8,
+    memo_done=9,
+    joining=10,
+    running_ended=11,
+};
+
+// task dependency struct
+struct task{
+    unsigned long id;
+    enum state status;
+    unsigned long* depends;
+    unsigned long depcount;
+    char* exec_label;
+    char* func_name;
+    double time_invoked;
+    int join;
+
+    PyObject* future;
+    PyObject* executor;
+    PyObject* func;
+    PyObject* args;
+    PyObject* kwargs;
+};
+
+static int init_tasktable(unsigned long); // allocate initial amont of memory for table
+static int resize_tasktable(unsigned long); // change amount of memory in table
+static int increment_tasktable(void); // will try to increase table size by TABLE_INC
+static int appendtask(char*, char*, double, int, PyObject*, PyObject*, PyObject*, PyObject*, PyObject*); // add a task to the dfk
+
+static PyObject* init_dfk(PyObject*, PyObject*);
+static PyObject* dest_dfk(PyObject*);
+static PyObject* info_dfk(PyObject*);
+static PyObject* info_task(PyObject*, PyObject*);
+static PyObject* submit(PyObject*, PyObject*);
 
 struct task* tasktable = NULL; // dag represented as table of task structs
 unsigned long tablesize; // number of tasks table can store
@@ -29,7 +78,7 @@ unsigned long taskcount; // number of tasks created
 
 PyObject* pystr_submit = NULL;
 
-int init_tasktable(unsigned long numtasks){
+static int init_tasktable(unsigned long numtasks){
     tasktable = (struct task*)PyMem_RawMalloc(sizeof(struct task) * numtasks);
     if(tasktable == NULL)
         return -1;
@@ -38,7 +87,7 @@ int init_tasktable(unsigned long numtasks){
     return 0;
 }
 
-int resize_tasktable(unsigned long numtasks){
+static int resize_tasktable(unsigned long numtasks){
     if(numtasks > ULONG_MAX) // check if size is too big
         return -1;
 
@@ -52,20 +101,20 @@ int resize_tasktable(unsigned long numtasks){
     return 0;
 }
 
-int increment_tasktable(){
+static int increment_tasktable(){
     if(tablesize + TABLE_INC > ULONG_MAX)
         return -1;
     return resize_tasktable(tablesize + TABLE_INC);
 }
 
 /*
- * In future create function for deleting task to
+ * In future create function for deletinrg task to
  * conserve space in the task table. Right now the
  * goal if to implement something super simple and
  * functional so task will not be deleted we will
  * just add new task in the next unused spot
  */
-int appendtask(char* exec_label, char* func_name, double time_invoked, int join, PyObject* future, PyObject* executor, PyObject* func, PyObject* args, PyObject* kwargs){
+static int appendtask(char* exec_label, char* func_name, double time_invoked, int join, PyObject* future, PyObject* executor, PyObject* func, PyObject* args, PyObject* kwargs){
     // check if the table is large enough
     if(taskcount == tablesize)
         if(increment_tasktable() < 0)
@@ -92,7 +141,7 @@ int appendtask(char* exec_label, char* func_name, double time_invoked, int join,
     return 0;
 }
 
-PyObject* init_dfk(PyObject* self, PyObject* args){
+static PyObject* init_dfk(PyObject* self, PyObject* args){
     unsigned long numtasks;
     if(!PyArg_ParseTuple(args, "k", &numtasks))
         return NULL;
@@ -110,7 +159,7 @@ PyObject* init_dfk(PyObject* self, PyObject* args){
  * by the python interpreter but if memory becomes an
  * issue then we should make sure that this is the case
  */
-PyObject* dest_dfk(PyObject* self){
+static PyObject* dest_dfk(PyObject* self){
     if(tasktable != NULL)
         PyMem_RawFree(tasktable);
 
@@ -120,11 +169,11 @@ PyObject* dest_dfk(PyObject* self){
     return Py_None;
 }
 
-PyObject* info_dfk(PyObject* self){
+static PyObject* info_dfk(PyObject* self){
     return PyUnicode_FromFormat("DFK Info -> Tasktable pointer: %p; Task table size: %i; Task count: %i;", tasktable, tablesize, taskcount);
 }
 
-PyObject* info_task(PyObject* self, PyObject* args){
+static PyObject* info_task(PyObject* self, PyObject* args){
     unsigned long id;
 
     if(!PyArg_ParseTuple(args, "k", &id))
@@ -139,14 +188,14 @@ PyObject* info_task(PyObject* self, PyObject* args){
     struct task task = tasktable[id];
 
     return PyUnicode_FromFormat("Task %lu -> state: %i; depcount: %lu; exec_label: %s; func_name: %s; time invoked: %i; join: %i", // TODO find how to print float
-                                task.id, task.status, task.depcount, task.exec_label, task.func_name, task.time_invoked, task.join);
+                                task.id, task.status, task.depcount, task.exec_label, task.func_name, (int)task.time_invoked, task.join);
 }
 
 /*
  * TODO When freeing a task will need to decrement the refernce counts
  * of the python objects taken as a argument
  */
-PyObject* submit(PyObject* self, PyObject* args){
+static PyObject* submit(PyObject* self, PyObject* args){
     char* exec_label,* func_name;
     int join;
     double time_invoked;
@@ -176,4 +225,37 @@ PyObject* submit(PyObject* self, PyObject* args){
         return NULL;
 
     return exec_fu;
+}
+
+char init_dfk_docs[] = "This method will initialize the dfk. In doing so this method will allocate memory for the dag and reset global state.";
+char dest_dfk_docs[] = "This method will destroy the dfk. In doing so this method will dealocate memory for the dag and reset global state.";
+char info_dfk_docs[] = "This method prints the global state associated with the dfk.";
+char submit_docs[] = "Takes in a function and its arguments, creates a task in the dag, and invokes executor.submit";
+char info_task_docs[] = "takes as input an id as an int and returns information about a the task with that id";
+
+PyMethodDef backend_funcs[] = {
+    {"init_dfk", (PyCFunction)init_dfk, METH_VARARGS, init_dfk_docs},
+    {"dest_dfk", (PyCFunction)dest_dfk, METH_NOARGS, dest_dfk_docs},
+    {"info_dfk", (PyCFunction)info_dfk, METH_NOARGS, info_dfk_docs},
+    {"info_task", (PyCFunction)info_task, METH_VARARGS, info_task_docs},
+    {"submit", (PyCFunction)submit, METH_VARARGS, submit_docs},
+    {NULL}
+};
+
+char backend_docs[] = "Implementing the DFK in C";
+
+PyModuleDef backend_mod = {
+    PyModuleDef_HEAD_INIT,
+    "backend",
+    backend_docs,
+    -1, // all per interpreter state is global, as a consequence this module cannot support sub interpreters
+    backend_funcs,
+    NULL,
+    NULL,
+    NULL,
+    NULL
+};
+
+PyMODINIT_FUNC PyInit_backend(void){
+    return PyModule_Create(&backend_mod);
 }
