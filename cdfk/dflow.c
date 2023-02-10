@@ -233,7 +233,7 @@ char info_dfk_docs[] = "This method prints the global state associated with the 
 char submit_docs[] = "Takes in a function and its arguments, creates a task in the dag, and invokes executor.submit";
 char info_task_docs[] = "takes as input an id as an int and returns information about a the task with that id";
 
-PyMethodDef backend_funcs[] = {
+PyMethodDef cdflow_funcs[] = {
     {"init_dfk", (PyCFunction)init_dfk, METH_VARARGS, init_dfk_docs},
     {"dest_dfk", (PyCFunction)dest_dfk, METH_NOARGS, dest_dfk_docs},
     {"info_dfk", (PyCFunction)info_dfk, METH_NOARGS, info_dfk_docs},
@@ -242,20 +242,20 @@ PyMethodDef backend_funcs[] = {
     {NULL}
 };
 
-char backend_docs[] = "Implementing the DFK in C";
+char cdflow_docs[] = "Implementing the DFK in C";
 
-PyModuleDef backend_mod = {
+PyModuleDef cdflow_mod = {
     PyModuleDef_HEAD_INIT,
     "backend",
-    backend_docs,
+    cdflow_docs,
     -1, // all per interpreter state is global, as a consequence this module cannot support sub interpreters
-    backend_funcs,
+    cdflow_funcs,
     NULL,
     NULL,
     NULL,
     NULL
 };
 
-PyMODINIT_FUNC PyInit_backend(void){
-    return PyModule_Create(&backend_mod);
+PyMODINIT_FUNC PyInit_cdflow(void){
+    return PyModule_Create(&cdflow_mod);
 }
