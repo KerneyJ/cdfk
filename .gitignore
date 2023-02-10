@@ -4,3 +4,4 @@ build/
 dist/
 cdfk.egg-info/
 parsl_run_dir/
+cdfk/__pycache__/
