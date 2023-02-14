@@ -60,10 +60,14 @@ static int appendtask(char*, char*, double, int, PyObject*, PyObject*, PyObject*
 static PyObject* init_dfk(PyObject*, PyObject*);
 static PyObject* dest_dfk(PyObject*);
 static PyObject* info_dfk(PyObject*);
+static PyObject* add_executor_dfk(PyObject*, PyObject*);
 static PyObject* info_task(PyObject*, PyObject*);
 static PyObject* submit(PyObject*, PyObject*);
 
 struct task* tasktable = NULL; // dag represented as table of task structs
+PyObject** executors = NULL; // Array of executor PyObject* TODO Will need to check the reference count of these objects before picking them and launching
+unsigned int executorssize = 0;
+unsigned int executorcount= 0;
 unsigned long tablesize; // number of tasks table can store
 unsigned long taskcount; // number of tasks created
 
@@ -149,6 +153,9 @@ static PyObject* init_dfk(PyObject* self, PyObject* args){
     if(init_tasktable(numtasks) < 0)
         return NULL;
 
+    executorssize = 2; // default size of executor array to 2(1 for internal and 1 for external)
+    executors = (PyObject**)PyMem_RawMalloc(executorssize * sizeof(PyObject*));
+
     pystr_submit = Py_BuildValue("s", "submit");
     return Py_None;
 }
@@ -171,6 +178,21 @@ static PyObject* dest_dfk(PyObject* self){
 
 static PyObject* info_dfk(PyObject* self){
     return PyUnicode_FromFormat("DFK Info -> Tasktable pointer: %p; Task table size: %i; Task count: %i;", tasktable, tablesize, taskcount);
+}
+
+
+static PyObject* add_executor_dfk(PyObject* self, PyObject* args){
+    PyObject* executor;
+    if(!PyArg_ParseTuple(args, "O", &executor)) // TODO type check executor object to make sure it isn't a list, tuple, or other iterable
+        return NULL;
+    if(executorcount == executorsize){ // executor count should never be greater than executorsize because it should only ever be incremented by 1
+        if((executors = PyMem_RawRealloc(executors, (executorsize+1) * sizeof(PyObject*))) == NULL)
+            return NULL; // memory error
+        executorsize++;
+    }
+    executors[executorcount] = executor;
+    executorcount++;
+    return Py_None
 }
 
 static PyObject* info_task(PyObject* self, PyObject* args){
@@ -230,6 +252,7 @@ static PyObject* submit(PyObject* self, PyObject* args){
 char init_dfk_docs[] = "This method will initialize the dfk. In doing so this method will allocate memory for the dag and reset global state.";
 char dest_dfk_docs[] = "This method will destroy the dfk. In doing so this method will dealocate memory for the dag and reset global state.";
 char info_dfk_docs[] = "This method prints the global state associated with the dfk.";
+char add_executor_dfk_docs[] = "This method appends a new executor to the executor table";
 char submit_docs[] = "Takes in a function and its arguments, creates a task in the dag, and invokes executor.submit";
 char info_task_docs[] = "takes as input an id as an int and returns information about a the task with that id";
 
@@ -238,6 +261,7 @@ PyMethodDef cdflow_funcs[] = {
     {"dest_dfk", (PyCFunction)dest_dfk, METH_NOARGS, dest_dfk_docs},
     {"info_dfk", (PyCFunction)info_dfk, METH_NOARGS, info_dfk_docs},
     {"info_task", (PyCFunction)info_task, METH_VARARGS, info_task_docs},
+    {"add_executor_dfk", (PyCFunction)add_executor_dfk, METH_VARARGS, add_executor_dfk_docs},
     {"submit", (PyCFunction)submit, METH_VARARGS, submit_docs},
     {NULL}
 };
