@@ -37,6 +37,7 @@ class TestFastDFK(unittest.TestCase):
             return 1 + 3
 
         executor = cdfk.intrnlexec.FDFKInternalExecutor(worker_count=4)
+        executor.run_dir = "parsl_run_dir/"
         executor.start()
         exec_fu = executor.submit(add)
         while not exec_fu.done():
