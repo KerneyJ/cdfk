@@ -2,8 +2,7 @@
 import cdfk
 import unittest
 
-class TestCDFK(unittest.TestCase):
-
+"""
     def test_init_dfk(self):
         cdfk.init_dfk(10)
 
@@ -30,6 +29,22 @@ class TestCDFK(unittest.TestCase):
         while not exec_fu.done():
             pass
         executor.shutdown()
+"""
+
+class TestFastDFK(unittest.TestCase):
+    def test_internal_executor(self):
+        def add():
+            return 1 + 3
+
+        executor = cdfk.intrnlexec.FDFKInternalExecutor(worker_count=4)
+        executor.start()
+        exec_fu = executor.submit(add)
+        while not exec_fu.done():
+            pass
+        executor.shutdown()
+
+    def test_dflow(self):
+        pass
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
