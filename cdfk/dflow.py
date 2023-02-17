@@ -7,7 +7,7 @@ from parsl.config import Config
 from .utils import make_rundir
 from .intrnlexec import FDFKInternalExecutor
 
-class FastDFK(object):
+class DataflowKernel(object):
     def __init__(self, config=Config(), table_size=10000):
         cdflow.init_dfk(table_size)
         self._config = config
