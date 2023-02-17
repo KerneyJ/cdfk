@@ -13,8 +13,10 @@
  */
 #include <Python.h>
 #include <limits.h>
+#include <stdlib.h>
 
 #define TABLE_INC 10000
+#define EXEC_COUNT 10
 
 /*
  * Based on States enum in parsl/dataflow/states.py found at
@@ -52,6 +54,11 @@ struct task{
     PyObject* kwargs;
 };
 
+struct executor{
+    PyObject* obj;
+    char* label;
+};
+
 static int init_tasktable(unsigned long); // allocate initial amont of memory for table
 static int resize_tasktable(unsigned long); // change amount of memory in table
 static int increment_tasktable(void); // will try to increase table size by TABLE_INC
@@ -60,13 +67,14 @@ static int appendtask(char*, char*, double, int, PyObject*, PyObject*, PyObject*
 static PyObject* init_dfk(PyObject*, PyObject*);
 static PyObject* dest_dfk(PyObject*);
 static PyObject* info_dfk(PyObject*);
+static PyObject* info_exec_dfk(PyObject*);
 static PyObject* add_executor_dfk(PyObject*, PyObject*);
+static PyObject* shutdown_executor_dfk(PyObject*);
 static PyObject* info_task(PyObject*, PyObject*);
 static PyObject* submit(PyObject*, PyObject*);
 
 struct task* tasktable = NULL; // dag represented as table of task structs
-PyObject** executors = NULL; // Array of executor PyObject* TODO Will need to check the reference count of these objects before picking them and launching
-unsigned int executorssize = 0;
+struct executor executors[EXEC_COUNT]; // Array of executor structs that store the label, 10 executor cap right now
 unsigned int executorcount= 0;
 unsigned long tablesize; // number of tasks table can store
 unsigned long taskcount; // number of tasks created
@@ -81,6 +89,7 @@ unsigned long taskcount; // number of tasks created
  */
 
 PyObject* pystr_submit = NULL;
+PyObject* pystr_shutdown = NULL;
 
 static int init_tasktable(unsigned long numtasks){
     tasktable = (struct task*)PyMem_RawMalloc(sizeof(struct task) * numtasks);
@@ -153,10 +162,8 @@ static PyObject* init_dfk(PyObject* self, PyObject* args){
     if(init_tasktable(numtasks) < 0)
         return NULL;
 
-    executorssize = 2; // default size of executor array to 2(1 for internal and 1 for external)
-    executors = (PyObject**)PyMem_RawMalloc(executorssize * sizeof(PyObject*));
-
     pystr_submit = Py_BuildValue("s", "submit");
+    pystr_shutdown = Py_BuildValue("s", "shutdown");
     return Py_None;
 }
 
@@ -180,21 +187,35 @@ static PyObject* info_dfk(PyObject* self){
     return PyUnicode_FromFormat("DFK Info -> Tasktable pointer: %p; Task table size: %i; Task count: %i;", tasktable, tablesize, taskcount);
 }
 
-
-static PyObject* add_executor_dfk(PyObject* self, PyObject* args){
-    PyObject* executor;
-    if(!PyArg_ParseTuple(args, "O", &executor)) // TODO type check executor object to make sure it isn't a list, tuple, or other iterable
-        return NULL;
-    if(executorcount == executorsize){ // executor count should never be greater than executorsize because it should only ever be incremented by 1
-        if((executors = PyMem_RawRealloc(executors, (executorsize+1) * sizeof(PyObject*))) == NULL)
-            return NULL; // memory error
-        executorsize++;
+static PyObject* info_exec_dfk(PyObject* self){
+    for(unsigned int i = 0; i < executorcount; i++){
+        if(PyObject_Print(executors[i].obj, stdout, 0) < 0)
+           return NULL; // TODO raise an error
     }
-    executors[executorcount] = executor;
-    executorcount++;
-    return Py_None
+    return Py_None;
 }
 
+static PyObject* add_executor_dfk(PyObject* self, PyObject* args){
+    PyObject* executor = NULL;
+    char* exec_label = NULL;
+    if(executorcount == EXEC_COUNT)
+        return NULL; // TODO return error
+    if(!PyArg_ParseTuple(args, "Os", &executor, &exec_label)) // TODO type check executor object to make sure it isn't a list, tuple, or other iterable
+        return NULL;
+
+    executors[executorcount].obj = executor;
+    executors[executorcount].label = exec_label;
+    executorcount++;
+    return Py_None;
+}
+
+static PyObject* shutdown_executor_dfk(PyObject* self){
+    for(unsigned int i = 0; i < executorcount; i++){
+        if(executors[i].obj != NULL)
+            PyObject_CallMethodObjArgs(executors[i].obj, pystr_shutdown, NULL);
+    }
+    return Py_None;
+}
 static PyObject* info_task(PyObject* self, PyObject* args){
     unsigned long id;
 
@@ -218,29 +239,39 @@ static PyObject* info_task(PyObject* self, PyObject* args){
  * of the python objects taken as a argument
  */
 static PyObject* submit(PyObject* self, PyObject* args){
-    char* exec_label,* func_name;
+    char* func_name;
     int join;
     double time_invoked;
-    PyObject* future,* executor,* func,* fargs=NULL,* fkwargs=NULL,* exec_fu=NULL;
+    struct executor exec;
+    PyObject* future = NULL,* func = NULL,* fargs=NULL,* fkwargs=NULL,* exec_fu=NULL;
 
-    if(!PyArg_ParseTuple(args, "ssdpOOO|OO", &exec_label, &func_name, &time_invoked, &join, &future, &executor, &func, &fargs, &fkwargs))
+    if(!PyArg_ParseTuple(args, "sdpOO|OO", &func_name, &time_invoked, &join, &future, &func, &fargs, &fkwargs))
         return NULL;
 
-    if(appendtask(exec_label, func_name, time_invoked, join, future, executor, func, fargs, fkwargs) < 0)
+    if(join){
+        // use the internal executor
+        exec = executors[0]; // we assume that executor 0 is always the internal executor
+    }
+    else{
+        // use non internal executor(s)
+        exec = executors[(rand() % executorcount-1) + 1];
+    }
+
+    if(appendtask(exec.label, func_name, time_invoked, join, future, exec.obj, func, fargs, fkwargs) < 0)
         return NULL;
 
     // invoke executor submit function
     if(fargs != NULL){
         if(fkwargs != NULL)
-            exec_fu = PyObject_CallMethodObjArgs(executor, pystr_submit, func, Py_None, fargs, fkwargs);
+            exec_fu = PyObject_CallMethodObjArgs(exec.obj, pystr_submit, func, Py_None, fargs, fkwargs);
         else
-            exec_fu = PyObject_CallMethodObjArgs(executor, pystr_submit, func, Py_None, fargs, NULL);
+            exec_fu = PyObject_CallMethodObjArgs(exec.obj, pystr_submit, func, Py_None, fargs, NULL);
     }
     else{
         if(fkwargs != NULL)
-            exec_fu = PyObject_CallMethodObjArgs(executor, pystr_submit, func, Py_None, Py_None, fkwargs, NULL);
+            exec_fu = PyObject_CallMethodObjArgs(exec.obj, pystr_submit, func, Py_None, Py_None, fkwargs, NULL);
         else
-            exec_fu = PyObject_CallMethodObjArgs(executor, pystr_submit, func, Py_None, NULL);
+            exec_fu = PyObject_CallMethodObjArgs(exec.obj, pystr_submit, func, Py_None, NULL);
     }
 
     if(exec_fu == NULL) // this exist because in the future we should set PyErr and return
@@ -252,7 +283,9 @@ static PyObject* submit(PyObject* self, PyObject* args){
 char init_dfk_docs[] = "This method will initialize the dfk. In doing so this method will allocate memory for the dag and reset global state.";
 char dest_dfk_docs[] = "This method will destroy the dfk. In doing so this method will dealocate memory for the dag and reset global state.";
 char info_dfk_docs[] = "This method prints the global state associated with the dfk.";
+char info_exec_dfk_docs[] = "Loops through all the executor PyObjects stored in executors array and prints them";
 char add_executor_dfk_docs[] = "This method appends a new executor to the executor table";
+char shutdown_executor_dfk_docs[] = "Loops through all the executor PyObjects stored in executors array and invokes their shutdown function";
 char submit_docs[] = "Takes in a function and its arguments, creates a task in the dag, and invokes executor.submit";
 char info_task_docs[] = "takes as input an id as an int and returns information about a the task with that id";
 
@@ -260,8 +293,10 @@ PyMethodDef cdflow_funcs[] = {
     {"init_dfk", (PyCFunction)init_dfk, METH_VARARGS, init_dfk_docs},
     {"dest_dfk", (PyCFunction)dest_dfk, METH_NOARGS, dest_dfk_docs},
     {"info_dfk", (PyCFunction)info_dfk, METH_NOARGS, info_dfk_docs},
+    {"info_exec_dfk", (PyCFunction)info_exec_dfk, METH_NOARGS, info_exec_dfk_docs},
     {"info_task", (PyCFunction)info_task, METH_VARARGS, info_task_docs},
     {"add_executor_dfk", (PyCFunction)add_executor_dfk, METH_VARARGS, add_executor_dfk_docs},
+    {"shutdown_executor_dfk", (PyCFunction)shutdown_executor_dfk, METH_NOARGS, shutdown_executor_dfk_docs},
     {"submit", (PyCFunction)submit, METH_VARARGS, submit_docs},
     {NULL}
 };

@@ -35,7 +35,7 @@ class FDFKInternalExecutor(NoStatusHandlingExecutor, RepresentationMixin):
                  label: str = '_parsl_internal',
                  working_dir: Optional[str] = None,
                  worker_debug: bool = False,
-                 worker_count: Union[int, float] = float('inf')):
+                 worker_count: int = 4):
 
         NoStatusHandlingExecutor.__init__(self)
         logger.info("Initializing FDFK Internal Executor")

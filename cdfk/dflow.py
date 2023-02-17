@@ -1,21 +1,24 @@
+import cdflow
+import time
 import datetime
 
 from uuid import uuid4
 from parsl.config import Config
+from .utils import make_rundir
+from .intrnlexec import FDFKInternalExecutor
 
 class FastDFK(object):
-    import cdflow
-    from .utils import make_rundir
     def __init__(self, config=Config(), table_size=10000):
         cdflow.init_dfk(table_size)
         self._config = config
         self.futlst = []
+        self.run_dir = make_rundir(config.run_dir)
         self.run_id = str(uuid4())
         self.time_began = datetime.datetime.now()
         self.hub_address = None # TODO Is this necessary
         self.hub_interchange_port = None # TODO Is this necessary
-        self._parsl_internal_executor = FDFKInternalExecutor() # TODO Implement this
-        self.add_executors(self._parsl_internal_executor + config.executors)
+        self._parsl_internal_executor = FDFKInternalExecutor(worker_count=4)
+        self.add_executors([self._parsl_internal_executor] + config.executors)
 
 
     def add_executors(self, executors):
@@ -35,7 +38,8 @@ class FastDFK(object):
                             self._create_remote_dirs_over_channel(executor.provider, channel)
                     else:
                         self._create_remote_dirs_over_channel(executor.provider, executor.provider.channel)
-            cdflow.add_executor_dfk(executor)
+            cdflow.add_executor_dfk(executor, executor.label)
+            block_ids = executor.start()
 
     def submit(self, func, app_args, executors='all', cache=False, ignore_for_cache=None, app_kwargs={}, join=False):
         """
@@ -51,7 +55,14 @@ class FastDFK(object):
           * fargs: Argument list object
           * fkwarg: Keyword argument list object
         """
-        exec_fu = cdflow.submit()
+        return  cdflow.submit(func.__name__, time.time(), join, object(), func)
+
+    def info_executors(self):
+        cdflow.info_exec_dfk()
+
+    def cleanup(self):
+        cdflow.shutdown_executor_dfk()
+        cdflow.dest_dfk()
 
     def _create_remote_dirs_over_channel(self, provider, channel):
         """ Create script directories across a channel
