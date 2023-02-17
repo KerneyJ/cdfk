@@ -32,17 +32,48 @@ import unittest
 """
 
 class TestFastDFK(unittest.TestCase):
+    run_dir = "parsl_run_dir/"
     def test_internal_executor(self):
         def add():
             return 1 + 3
 
         executor = cdfk.intrnlexec.FDFKInternalExecutor(worker_count=4)
-        executor.run_dir = "parsl_run_dir/"
+        executor.run_dir = TestFastDFK.run_dir
         executor.start()
         exec_fu = executor.submit(add)
         while not exec_fu.done():
             pass
         executor.shutdown()
+
+    def test_cdfk(self):
+        import cdflow
+        import time
+        def add():
+            return 1 + 3
+        cdflow.init_dfk(10)
+        executor = cdfk.intrnlexec.FDFKInternalExecutor(worker_count=4)
+        executor.run_dir = TestFastDFK.run_dir
+        executor.start()
+        cdflow.add_executor_dfk(executor, executor.label)
+        exec_fu = cdflow.submit("add", time.time(), False, object(), add)
+        while not exec_fu.done():
+            pass
+        cdflow.dest_dfk()
+        executor.shutdown()
+
+    def test_py_dfk_exec(self):
+        dfk = cdfk.dflow.FastDFK()
+        dfk.info_executors()
+
+    def test_py_dfk_wrapper(self):
+        def add():
+            return 1 + 3
+
+        dfk = cdfk.dflow.FastDFK()
+        exec_fu = dfk.submit(add, None, join=False)
+        while not exec_fu.done():
+            pass
+        dfk.cleanup()
 
     def test_dflow(self):
         pass
