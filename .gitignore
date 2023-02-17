@@ -3,5 +3,6 @@ venv/
 build/
 dist/
 cdfk.egg-info/
+runinfo/
 parsl_run_dir/
 cdfk/__pycache__/
