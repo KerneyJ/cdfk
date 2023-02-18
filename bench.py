@@ -32,8 +32,7 @@ def bench_10k_add_cdfk():
         futtable.append(add())
     out = [f.result() for f in futtable]
     end = time.perf_counter()
-    dfk.cleanup()
     return end - start
 
 if __name__ == "__main__":
-    print(f"{10000 / bench_50k_add_cdfk()}")
+    print(f"{10000 / bench_10k_add_cdfk()}")
