@@ -1,3 +1,6 @@
+import os
+import atexit
+import logging
 import cdflow
 import time
 import datetime
@@ -7,9 +10,12 @@ from parsl.config import Config
 from .utils import make_rundir
 from .intrnlexec import FDFKInternalExecutor
 
+logger = logging.getLogger(__name__)
+
 class DataflowKernel(object):
     def __init__(self, config=Config(), table_size=10000):
         cdflow.init_dfk(table_size)
+        self.cleanup_called = False
         self._config = config
         self.futlst = []
         self.run_dir = make_rundir(config.run_dir)
@@ -19,7 +25,7 @@ class DataflowKernel(object):
         self.hub_interchange_port = None # TODO Is this necessary
         self._parsl_internal_executor = FDFKInternalExecutor(worker_count=4)
         self.add_executors([self._parsl_internal_executor] + config.executors)
-
+        atexit.register(self.atexit_cleanup)
 
     def add_executors(self, executors):
         for executor in executors:
@@ -63,6 +69,7 @@ class DataflowKernel(object):
     def cleanup(self):
         cdflow.shutdown_executor_dfk()
         cdflow.dest_dfk()
+        self.cleanup_called = True
 
     def _create_remote_dirs_over_channel(self, provider, channel):
         """ Create script directories across a channel
@@ -85,3 +92,10 @@ class DataflowKernel(object):
                 provider.script_dir = os.path.join(run_dir, 'local_submit_scripts')
 
         channel.makedirs(channel.script_dir, exist_ok=True)
+
+    def atexit_cleanup(self) -> None:
+        if not self.cleanup_called:
+            logger.info("DFK cleanup because python process is exiting")
+            self.cleanup()
+        else:
+            logger.info("python process is exiting, but DFK has already been cleaned up")
