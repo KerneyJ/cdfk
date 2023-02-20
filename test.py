@@ -3,6 +3,9 @@ import cdfk
 import unittest
 
 from parsl import python_app
+from parsl.config import Config
+from parsl.executors import HighThroughputExecutor
+from parsl.providers import LocalProvider
 
 class TestCDFK(unittest.TestCase):
     run_dir = "parsl_run_dir/"
@@ -44,11 +47,39 @@ class TestCDFK(unittest.TestCase):
             pass
         dfk.cleanup()
 
-    def test_python_app(self):
-        dfk = cdfk.dflow.DataflowKernel()
+#    def test_python_app(self):
+#        dfk = cdfk.dflow.DataflowKernel()
+#        @python_app(data_flow_kernel=dfk)
+#        def add():
+#            return 1 + 3
+#
+#        num = add()
+#        while not num.done():
+#            pass
+#        dfk.cleanup()
+
+    def test_cdfk_with_htex(self):
+        config = Config(
+            executors=[HighThroughputExecutor(
+                cores_per_worker=1,
+                label=f"HTEX",
+                managed=True,
+                worker_debug=False,
+                max_workers=4,
+                provider=LocalProvider(
+                    init_blocks=1,
+                    max_blocks=1,
+                    min_blocks=1,
+                    nodes_per_block=1,
+                ),
+            )],
+            run_dir="runinfo",
+        )
+        dfk = cdfk.dflow.DataflowKernel(config=config)
+
         @python_app(data_flow_kernel=dfk)
         def add():
-            return 1 + 3
+            return 2 + 2
 
         num = add()
         while not num.done():
