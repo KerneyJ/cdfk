@@ -160,7 +160,7 @@ static PyObject* init_dfk(PyObject* self, PyObject* args){
         return NULL;
 
     if(init_tasktable(numtasks) < 0)
-        return NULL;
+        return PyErr_SetString(PyExc_RuntimeError, "CDFK failed to initialize task table");
 
     pystr_submit = Py_BuildValue("s", "submit");
     pystr_shutdown = Py_BuildValue("s", "shutdown");
@@ -190,7 +190,7 @@ static PyObject* info_dfk(PyObject* self){
 static PyObject* info_exec_dfk(PyObject* self){
     for(unsigned int i = 0; i < executorcount; i++){
         if(PyObject_Print(executors[i].obj, stdout, 0) < 0)
-           return NULL; // TODO raise an error
+           return PyErr_Format(PyExc_RuntimeError, "CDFK failed to print executor %i from executor table", i);
     }
     return Py_None;
 }
@@ -199,7 +199,7 @@ static PyObject* add_executor_dfk(PyObject* self, PyObject* args){
     PyObject* executor = NULL;
     char* exec_label = NULL;
     if(executorcount == EXEC_COUNT)
-        return NULL; // TODO return error
+        return PyErr_Format(PyExc_RuntimeError, "CDFK failed to add new executor, %i executors are supported", EXEC_COUNT);
     if(!PyArg_ParseTuple(args, "Os", &executor, &exec_label)) // TODO type check executor object to make sure it isn't a list, tuple, or other iterable
         return NULL;
 
@@ -258,7 +258,7 @@ static PyObject* submit(PyObject* self, PyObject* args){
     }
 
     if(appendtask(exec.label, func_name, time_invoked, join, future, exec.obj, func, fargs, fkwargs) < 0)
-        return NULL;
+        return PyErr_Format(PyExc_RuntimeError, "CDFK failed to append new task to task table");
 
     // invoke executor submit function
     if(fargs != NULL){
@@ -274,8 +274,8 @@ static PyObject* submit(PyObject* self, PyObject* args){
             exec_fu = PyObject_CallMethodObjArgs(exec.obj, pystr_submit, func, Py_None, NULL);
     }
 
-    if(exec_fu == NULL) // this exist because in the future we should set PyErr and return
-        return NULL;
+    if(exec_fu == NULL)
+        return PyErr_Format(PyExc_RuntimeError, "CDFK exec_fu PyObject* returned by invocation of %s.submit is NULL", exec.label);
 
     return exec_fu;
 }
