@@ -1,8 +1,9 @@
-*.csv
 venv/
 build/
+data/
 dist/
 cdfk.egg-info/
 runinfo/
 parsl_run_dir/
 cdfk/__pycache__/
+__pycache__/
