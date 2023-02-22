@@ -160,7 +160,7 @@ static PyObject* init_dfk(PyObject* self, PyObject* args){
         return NULL;
 
     if(init_tasktable(numtasks) < 0)
-        return PyErr_SetString(PyExc_RuntimeError, "CDFK failed to initialize task table");
+        return PyErr_Format(PyExc_RuntimeError, "CDFK failed to initialize task table");
 
     pystr_submit = Py_BuildValue("s", "submit");
     pystr_shutdown = Py_BuildValue("s", "shutdown");
@@ -179,6 +179,9 @@ static PyObject* dest_dfk(PyObject* self){
 
     tablesize = 0;
     taskcount = 0;
+
+    Py_XDECREF(pystr_submit);
+    Py_XDECREF(pystr_shutdown);
 
     return Py_None;
 }
