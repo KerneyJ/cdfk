@@ -6,17 +6,22 @@ import time
 import datetime
 
 from uuid import uuid4
+from parsl import set_file_logger
 from parsl.config import Config
 from .utils import make_rundir
 from .intrnlexec import FDFKInternalExecutor
 
-logger = logging.getLogger(__name__)
 
 class DataflowKernel(object):
     def __init__(self, config=Config(), table_size=10000):
+        self._config = config
+        self.run_dir = make_rundir(config.run_dir)
+        self.run_id = str(uuid4())
+
+        # set_file_logger(f"{self.run_dir}/parsl.log", level=logging.DEBUG)
+        logger = start_file_logger(filename=f"{self.run_dir}/parsl.log")
         cdflow.init_dfk(table_size)
         self.cleanup_called = False
-        self._config = config
         self.futlst = []
         self.run_dir = make_rundir(config.run_dir)
         self.run_id = str(uuid4())
@@ -26,6 +31,7 @@ class DataflowKernel(object):
         self._parsl_internal_executor = FDFKInternalExecutor(worker_count=4)
         self.add_executors([self._parsl_internal_executor] + config.executors)
         atexit.register(self.atexit_cleanup)
+        logger.info("Successfully initialized DFK")
 
     def add_executors(self, executors):
         for executor in executors:
@@ -39,7 +45,7 @@ class DataflowKernel(object):
                     os.makedirs(executor.provider.script_dir, exist_ok=True)
 
                     if hasattr(executor.provider, 'channels'):
-                        logger.debug("Creating script_dir across multiple channels")
+                        # logger.debug("Creating script_dir across multiple channels")
                         for channel in executor.provider.channels:
                             self._create_remote_dirs_over_channel(executor.provider, channel)
                     else:
@@ -95,7 +101,22 @@ class DataflowKernel(object):
 
     def atexit_cleanup(self) -> None:
         if not self.cleanup_called:
-            logger.info("DFK cleanup because python process is exiting")
+            # logger.info("DFK cleanup because python process is exiting")
             self.cleanup()
         else:
-            logger.info("python process is exiting, but DFK has already been cleaned up")
+            pass
+            # logger.info("python process is exiting, but DFK has already been cleaned up")
+
+def start_file_logger(filename, name='parsl', level=logging.DEBUG, format_string=None):
+    if format_string is None:
+        format_string = "%(asctime)s.%(msecs)03d %(name)s:%(lineno)d " \
+                        "%(process)d %(threadName)s "\
+                        "[%(levelname)s]  %(message)s"
+    l = logging.getLogger(name)
+    l.setLevel(logging.DEBUG)
+    handler = logging.FileHandler(filename)
+    handler.setLevel(level)
+    formatter = logging.Formatter(format_string, datefmt="%Y-%m-%d %H:%M:%S")
+    handler.setFormatter(formatter)
+    l.addHandler(handler)
+    return l
